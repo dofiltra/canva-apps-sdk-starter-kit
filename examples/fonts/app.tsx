@@ -13,6 +13,7 @@ import {
 } from "@canva/app-ui-kit";
 import type { Font, FontStyle, FontWeightName } from "@canva/asset";
 import { findFonts, requestFontSelection } from "@canva/asset";
+import { FontRef, openDesign } from "@canva/design";
 import { useState, useEffect, useCallback } from "react";
 import * as styles from "styles/components.css";
 import { useAddElement } from "utils/use_add_element";
@@ -43,11 +44,23 @@ const fontStyleOptions: {
 export const App = () => {
   const addElement = useAddElement();
   const [textConfig, setTextConfig] = useState<TextConfig>(initialConfig);
-  const [selectedFont, setSelectedFont] = useState<Font | undefined>(undefined);
+  const [selectedFont, setSelectedFont] = useState<Font | undefined>({
+    "ref": "YAEzvsyzAMI:0" as FontRef,
+    "name": "Funtastic",
+    "weights": [
+        {
+            "weight": "normal",
+            "styles": [
+                "normal"
+            ]
+        }
+    ],
+    "previewUrl": "https://media.canva.com/1/font-render/2/RnVudGFzdGlj_64_896_96_C_B_A_1.4_00000000_0e1318ff_A/aWZzOi8vLzE2Zjc5MTI4LTEwNDgtNGZjNy1hYTUyLTNhMTJiYzdlODk0YQ?osig=AAAAAAAAAAAAAAAAAAAAAHR1vtdd_Ff-CEHDuNM6jRtu-iK8RRNLfKwf-KVDcRQN&exp=1733412013&csig=AAAAAAAAAAAAAAAAAAAAAIs6Lldh-2lhMmyZ6XoSCTbjMDW79E430p1qIVMzcjAG"
+} as Font );
   const [availableFonts, setAvailableFonts] = useState<readonly Font[]>([]);
 
   const fetchFonts = useCallback(async () => {
-    const response = await findFonts();
+    const response = await findFonts({});
     setAvailableFonts(response.fonts);
   }, [setAvailableFonts]);
 
@@ -55,6 +68,7 @@ export const App = () => {
     fetchFonts();
   }, [fetchFonts]);
 
+ 
   const { text, fontWeight, fontStyle } = textConfig;
   const disabled = text.trim().length === 0;
   const availableFontWeights = getFontWeights(selectedFont);
@@ -80,9 +94,36 @@ export const App = () => {
         fontStyle:
           getFontStyles(fontWeight, selectedFont)[0]?.value || "normal",
         fontWeight: getFontWeights(selectedFont)[0]?.value || "normal",
+
       };
     });
   };
+
+  function handleOpenDesign() {
+    openDesign({ type: "current_page" }, async (draft) => {
+      console.log(draft);
+
+      if (draft.page.type !== "fixed") {
+        return;
+      }
+
+      // Moving all elements 50 pixels to the right and 50 pixels down
+      draft.page.elements.forEach((element) => {
+        element.left += 50;
+        element.top += 50;
+        console.log(`Moved element to (${element.left}, ${element.top}).`);
+      });
+
+
+      draft.page.elements.forEach((element, index) => {
+        console.log(
+          `Element ${index + 1}: Type=${element.type}, Position=(${element.left}, ${element.top})`
+        );
+      });
+      
+      return await draft.save();
+    });
+  }
 
   return (
     <div className={styles.scrollContainer}>
@@ -140,6 +181,7 @@ export const App = () => {
             const response = await requestFontSelection({
               selectedFontRef: selectedFont?.ref,
             });
+            console.log(`requestFontSelection`, response)
             if (response.type === "completed") {
               setSelectedFont(response.font);
               resetSelectedFontStyleAndWeight(response.font);
@@ -215,6 +257,16 @@ export const App = () => {
           stretch
         >
           Add text element
+        </Button>
+
+        <Button
+          variant="primary"
+          onClick={() => {
+            handleOpenDesign()
+          }}
+          stretch
+        >
+         c1
         </Button>
       </Rows>
     </div>

@@ -31,7 +31,7 @@ export const App = () => {
       aiDisclosure: "none",
     });
     await setCurrentPageBackground({
-      asset: { type: "image", ref },
+      asset: { type: "image", ref ,},
     });
     setLoading(false);
   };

@@ -11,7 +11,7 @@ export const App = (props: { onClick(): void }) => {
           how to start testing.
         </Text>
         <Button variant="primary" onClick={props.onClick}>
-          Do something cool
+          Create slide
         </Button>
       </Rows>
     </div>
