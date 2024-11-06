@@ -50,9 +50,9 @@ const initialConfig: TextConfig = {
 
 export const App = () => {
   const addElement = useAddElement();
-  const [tab, setTab] = useState<"images" | "headings" | "settings">(
-    "settings",
-  );
+  const [tab, setTab] = useState<
+    "images" | "headings" | "settings" | "datafile"
+  >("settings");
   const [limitSlidesCount, setLimitSlidesCount] = useState(5);
   const [textConfig, setTextConfig] = useState<TextConfig>(initialConfig);
   const [selectedFont, setSelectedFont] = useState<Font | undefined>({
@@ -70,6 +70,10 @@ export const App = () => {
   const [images, setImages] = useState([] as string[]);
   const [headings, setHeadings] = useState([] as string[]);
 
+  const [canvaData, setCanvaData] = useState<{
+    [doprompt: string]: { base64: string[]; heading?: string };
+  }>({});
+
   const { fontWeight, fontStyle } = textConfig;
 
   const resetSelectedFontStyleAndWeight = (selectedFont?: Font) => {
@@ -83,7 +87,7 @@ export const App = () => {
     });
   };
 
-  async function handleCreatePage() {
+  async function handleManualCreatePage() {
     const { width = 1920, height = 1080 } = {
       ...(await getDefaultPageDimensions()),
     };
@@ -176,12 +180,112 @@ export const App = () => {
     }
   }
 
+  async function handleDatafileCreatePage() {
+    const { width = 1920, height = 1080 } = {
+      ...(await getDefaultPageDimensions()),
+    };
+
+    const doprompts = Object.keys(canvaData).slice(0, limitSlidesCount);
+
+    for (const doprompt of doprompts) {
+      const { base64 = [], heading } = canvaData[doprompt];
+      let i = 0;
+
+      for (const imageBase64 of [...new Set(base64).values()]) {
+        const img = imageBase64
+          ? await upload({
+              type: "image",
+              mimeType: "image/png",
+              aiDisclosure: "none",
+              url: imageBase64,
+              thumbnailUrl: imageBase64,
+            })
+          : null;
+        await sleep(5e3);
+
+        const elements: ElementAtPoint[] = [
+          img?.ref && {
+            type: "image",
+            altText: { decorative: false, text: "pic" },
+            height,
+            width: "auto",
+            left: 50,
+            top: 0,
+            ref: img.ref,
+          },
+        ].filter((x) => x) as ElementAtPoint[];
+
+        await addPage({
+          title: heading?.split(" ").slice(0, 2).join(" "),
+          elements,
+        });
+        await sleep(3e3);
+
+        if (heading?.trim?.() && i === 0) {
+          addElement({
+            type: "text",
+            ...textConfig,
+            fontSize: 90,
+            fontRef: selectedFont?.ref,
+            children: [
+              heading
+                .split(" ")
+                .map((w, i) => w + (i % 3 !== 0 ? "\n" : " "))
+                .join(""),
+            ],
+          });
+        }
+
+        await new Promise((resolve) => {
+          openDesign({ type: "current_page" }, async (draft) => {
+            if (draft.page.type !== "fixed") {
+              return resolve(false);
+            }
+
+            draft.page.elements.forEach(async (element, index) => {
+              console.log(
+                `#${index + 1}: Type=${element.type}, Position=(${element.left}, ${element.top})`,
+                element,
+              );
+
+              if (element.type === "text") {
+                element.transparency = 0.25;
+                element = {
+                  ...element,
+                  top: 50,
+                  left: 100,
+                  width: width,
+                  height: 90,
+                };
+              }
+
+              if (element.type === "rect") {
+                element.transparency = 0.3;
+              }
+            });
+
+            return resolve(await draft.save());
+          });
+        });
+        i++;
+      }
+
+      setCanvaData((old) => {
+        delete old[doprompt];
+        return old;
+      });
+    }
+  }
+
   return (
     <div className={styles.scrollContainer}>
       <Tabs>
         <TabList align="start">
           <Tab id="settings" onClick={() => setTab("settings")}>
             Settings
+          </Tab>
+          <Tab id="datafile" onClick={() => setTab("datafile")}>
+            Datafile
           </Tab>
           <Tab id="images" onClick={() => setTab("images")}>
             Images
@@ -193,6 +297,117 @@ export const App = () => {
       </Tabs>
 
       <br />
+
+      {tab === "settings" && (
+        <>
+          <Title>Settings</Title>
+          <hr />
+          <br />
+
+          <Text>Add slides count</Text>
+          <NumberInput
+            onChangeComplete={(val) => setLimitSlidesCount(val || 3)}
+            defaultValue={limitSlidesCount}
+          />
+          <hr />
+
+          <Text>Font</Text>
+          <Rows spacing="2u">
+            <Button
+              variant="secondary"
+              icon={ChevronDownIcon}
+              iconPosition="end"
+              alignment="start"
+              stretch={true}
+              onClick={async () => {
+                const response = await requestFontSelection({
+                  selectedFontRef: selectedFont?.ref,
+                });
+                console.log(`requestFontSelection`, response);
+                if (response.type === "completed") {
+                  setSelectedFont(response.font);
+                  resetSelectedFontStyleAndWeight(response.font);
+                }
+              }}
+            >
+              {selectedFont?.name || "Select a font"}
+            </Button>
+            {selectedFont?.previewUrl && (
+              <Box background="neutralLow" padding="2u" width="full">
+                <Rows spacing="0" align="center">
+                  <Box>
+                    <ImageCard
+                      thumbnailUrl={selectedFont.previewUrl}
+                      alt={selectedFont.name}
+                    />
+                  </Box>
+                </Rows>
+              </Box>
+            )}
+          </Rows>
+        </>
+      )}
+
+      {tab === "datafile" && (
+        <>
+          <Title>Datafiles</Title>
+          <hr />
+          <br />
+          <FileInput
+            accept={[".json", ".txt"]}
+            multiple={false}
+            stretchButton
+            onDropAcceptedFiles={async (files) => {
+              const file = files?.[0];
+              if (!file) {
+                return;
+              }
+
+              const filetext = await file.text();
+              try {
+                setCanvaData(JSON.parse(filetext));
+              } catch (e) {
+                console.error(e);
+              }
+            }}
+          />
+
+          <hr />
+          <Rows key={`canvaData`} spacing="1u">
+            <Box
+              border="standard"
+              padding="1u"
+              className={""}
+              // background={background}
+            >
+              <Scrollable
+              // indicator={{
+              //   background,
+              // }}
+              >
+                <Rows spacing="1u">
+                  {Object.keys(canvaData).map((key, i) => {
+                    return (
+                      <>
+                        <FileInputItem
+                          key={`canvaData_${i}`}
+                          label={key}
+                          onDeleteClick={() =>
+                            setCanvaData((old) => {
+                              delete old[key];
+                              return old;
+                            })
+                          }
+                        />
+                      </>
+                    );
+                  })}
+                </Rows>
+              </Scrollable>
+            </Box>
+          </Rows>
+        </>
+      )}
 
       {tab === "images" && (
         <>
@@ -300,63 +515,16 @@ export const App = () => {
         </>
       )}
 
-      {tab === "settings" && (
-        <>
-          <Title>Settings</Title>
-          <hr />
-          <br />
-
-          <Text>Add slides count</Text>
-          <NumberInput
-            onChangeComplete={(val) => setLimitSlidesCount(val || 3)}
-            defaultValue={limitSlidesCount}
-          />
-          <hr />
-
-          <Text>Font</Text>
-          <Rows spacing="2u">
-            <Button
-              variant="secondary"
-              icon={ChevronDownIcon}
-              iconPosition="end"
-              alignment="start"
-              stretch={true}
-              onClick={async () => {
-                const response = await requestFontSelection({
-                  selectedFontRef: selectedFont?.ref,
-                });
-                console.log(`requestFontSelection`, response);
-                if (response.type === "completed") {
-                  setSelectedFont(response.font);
-                  resetSelectedFontStyleAndWeight(response.font);
-                }
-              }}
-            >
-              {selectedFont?.name || "Select a font"}
-            </Button>
-            {selectedFont?.previewUrl && (
-              <Box background="neutralLow" padding="2u" width="full">
-                <Rows spacing="0" align="center">
-                  <Box>
-                    <ImageCard
-                      thumbnailUrl={selectedFont.previewUrl}
-                      alt={selectedFont.name}
-                    />
-                  </Box>
-                </Rows>
-              </Box>
-            )}
-          </Rows>
-        </>
-      )}
-
       <hr />
       <br />
-      {((images.length || headings.length) && (
+      {((images.length || headings.length || Object.keys(canvaData).length) && (
         <Button
           variant="primary"
           onClick={() => {
-            handleCreatePage();
+            if (Object.keys(canvaData).length) {
+              return handleDatafileCreatePage();
+            }
+            handleManualCreatePage();
           }}
           stretch
         >
@@ -395,6 +563,7 @@ const getFontStyles = (
         ?.styles.map((s) => ({ value: s, label: s })) ?? [])
     : [];
 };
+
 const toBase64 = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
