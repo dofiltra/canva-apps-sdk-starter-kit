@@ -940,6 +940,11 @@
   resolved "https://registry.npmjs.org/@discoveryjs/json-ext/-/json-ext-0.5.7.tgz"
   integrity sha512-dBVuXR082gk3jsFp7Rd/JI4kytwGHecnCoTtXFb7DB6CNHp4rg5k1bhg0nWdLGLnOV71lmDzGQaLMy8iPLY0pw==
 
+"@dofiltra/helpers@^1.0.82":
+  version "1.0.82"
+  resolved "https://registry.npmjs.org/@dofiltra/helpers/-/helpers-1.0.82.tgz"
+  integrity sha512-qRxoyRNI+VPS+WiXofSD8fwejwUfrocpWe2gqkLh8dE8dibjqxIVLvDS3L/f3tQ2TxlVtup7GGamoyfAy1ZapA==
+
 "@eslint-community/eslint-utils@^4.2.0", "@eslint-community/eslint-utils@^4.4.0":
   version "4.4.0"
   dependencies:

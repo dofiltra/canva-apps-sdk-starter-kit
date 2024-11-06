@@ -34,6 +34,7 @@
     "@canva/error": "^2.0.0",
     "@canva/platform": "^2.0.0",
     "@canva/user": "^2.0.0",
+    "@dofiltra/helpers": "^1.0.82",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-intl": "6.6.8"
