@@ -13,7 +13,17 @@ import {
 } from "@canva/app-ui-kit";
 import type { Font, FontStyle, FontWeightName } from "@canva/asset";
 import { findFonts, requestFontSelection } from "@canva/asset";
-import { FontRef, openDesign } from "@canva/design";
+import {
+  FontRef,
+  openDesign,
+  addPage,
+  readContent,
+  getDefaultPageDimensions,
+  getDesignToken,
+  selection,
+  getCurrentPageContext,
+  overlay,
+} from "@canva/design";
 import { useState, useEffect, useCallback } from "react";
 import * as styles from "styles/components.css";
 import { useAddElement } from "utils/use_add_element";
@@ -21,15 +31,17 @@ import { useAddElement } from "utils/use_add_element";
 type TextConfig = {
   text: string;
   color: string;
+  fontSize: number;
   fontWeight: FontWeightName;
   fontStyle: FontStyle;
 };
 
 const initialConfig: TextConfig = {
-  text: "Hello world",
+  text: "Тестовый пример",
   color: "#8B3DFF",
   fontWeight: "normal",
   fontStyle: "normal",
+  fontSize: 90,
 };
 
 const fontStyleOptions: {
@@ -45,18 +57,17 @@ export const App = () => {
   const addElement = useAddElement();
   const [textConfig, setTextConfig] = useState<TextConfig>(initialConfig);
   const [selectedFont, setSelectedFont] = useState<Font | undefined>({
-    "ref": "YAEzvsyzAMI:0" as FontRef,
-    "name": "Funtastic",
-    "weights": [
-        {
-            "weight": "normal",
-            "styles": [
-                "normal"
-            ]
-        }
+    ref: "YAEzvsyzAMI:0" as FontRef,
+    name: "Funtastic",
+    weights: [
+      {
+        weight: "normal",
+        styles: ["normal"],
+      },
     ],
-    "previewUrl": "https://media.canva.com/1/font-render/2/RnVudGFzdGlj_64_896_96_C_B_A_1.4_00000000_0e1318ff_A/aWZzOi8vLzE2Zjc5MTI4LTEwNDgtNGZjNy1hYTUyLTNhMTJiYzdlODk0YQ?osig=AAAAAAAAAAAAAAAAAAAAAHR1vtdd_Ff-CEHDuNM6jRtu-iK8RRNLfKwf-KVDcRQN&exp=1733412013&csig=AAAAAAAAAAAAAAAAAAAAAIs6Lldh-2lhMmyZ6XoSCTbjMDW79E430p1qIVMzcjAG"
-} as Font );
+    previewUrl:
+      "https://media.canva.com/1/font-render/2/RnVudGFzdGlj_64_896_96_C_B_A_1.4_00000000_0e1318ff_A/aWZzOi8vLzE2Zjc5MTI4LTEwNDgtNGZjNy1hYTUyLTNhMTJiYzdlODk0YQ?osig=AAAAAAAAAAAAAAAAAAAAAHR1vtdd_Ff-CEHDuNM6jRtu-iK8RRNLfKwf-KVDcRQN&exp=1733412013&csig=AAAAAAAAAAAAAAAAAAAAAIs6Lldh-2lhMmyZ6XoSCTbjMDW79E430p1qIVMzcjAG",
+  } as Font);
   const [availableFonts, setAvailableFonts] = useState<readonly Font[]>([]);
 
   const fetchFonts = useCallback(async () => {
@@ -68,7 +79,6 @@ export const App = () => {
     fetchFonts();
   }, [fetchFonts]);
 
- 
   const { text, fontWeight, fontStyle } = textConfig;
   const disabled = text.trim().length === 0;
   const availableFontWeights = getFontWeights(selectedFont);
@@ -94,34 +104,66 @@ export const App = () => {
         fontStyle:
           getFontStyles(fontWeight, selectedFont)[0]?.value || "normal",
         fontWeight: getFontWeights(selectedFont)[0]?.value || "normal",
-
       };
     });
   };
 
-  function handleOpenDesign() {
-    openDesign({ type: "current_page" }, async (draft) => {
-      console.log(draft);
+  async function handleOpenDesign() {
+    const { width = 1920, height = 1080 } = {
+      ...(await getDefaultPageDimensions()),
+    };
 
-      if (draft.page.type !== "fixed") {
-        return;
-      }
+    // readContent({ contentType: "richtext", context: "current_page" }, (draft) =>
+    //   console.log("draft", draft),
+    // );
 
-      // Moving all elements 50 pixels to the right and 50 pixels down
-      draft.page.elements.forEach((element) => {
-        element.left += 50;
-        element.top += 50;
-        console.log(`Moved element to (${element.left}, ${element.top}).`);
+    const dt = await getDesignToken();
+    console.log("getDesignToken", dt);
+    console.log("selection", selection);
+
+    const cpc = await getCurrentPageContext();
+    console.log("cpc", cpc);
+    console.log("overlay", overlay);
+
+    addPage({
+      title: `test`,
+      elements: [
+        {
+          type: "text",
+          ...textConfig,
+          fontRef: selectedFont?.ref,
+          children: [textConfig.text],
+          top: 50,
+          left: 100,
+          width: width / 3,
+        },
+      ],
+    }).then(() => {
+      openDesign({ type: "current_page" }, async (draft) => {
+        console.log(draft);
+
+        if (draft.page.type !== "fixed") {
+          return;
+        }
+
+        // Moving all elements 50 pixels to the right and 50 pixels down
+        // draft.page.elements.forEach((element) => {
+        //   element.left += 50;
+        //   element.top += 50;
+        //   console.log(`Moved element to (${element.left}, ${element.top}).`);
+        // });
+
+        draft.page.elements.forEach((element, index) => {
+          console.log(
+            `Element ${index + 1}: Type=${element.type}, Position=(${element.left}, ${element.top})`,
+            element,
+          );
+          element.transparency = 0.35;
+          //
+        });
+
+        return await draft.save();
       });
-
-
-      draft.page.elements.forEach((element, index) => {
-        console.log(
-          `Element ${index + 1}: Type=${element.type}, Position=(${element.left}, ${element.top})`
-        );
-      });
-      
-      return await draft.save();
     });
   }
 
@@ -181,7 +223,7 @@ export const App = () => {
             const response = await requestFontSelection({
               selectedFontRef: selectedFont?.ref,
             });
-            console.log(`requestFontSelection`, response)
+            console.log(`requestFontSelection`, response);
             if (response.type === "completed") {
               setSelectedFont(response.font);
               resetSelectedFontStyleAndWeight(response.font);
@@ -262,11 +304,11 @@ export const App = () => {
         <Button
           variant="primary"
           onClick={() => {
-            handleOpenDesign()
+            handleOpenDesign();
           }}
           stretch
         >
-         c1
+          Create new page
         </Button>
       </Rows>
     </div>
