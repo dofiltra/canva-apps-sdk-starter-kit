@@ -25,7 +25,7 @@ function buildConfig({
   appEntry = path.join(__dirname, "src", "index.tsx"),
   backendHost = process.env.CANVA_BACKEND_HOST,
 } = {}) {
-  const mode = devConfig ? "development" : "production";
+  const mode = "development" //devConfig ? "development" : "production";
 
   if (!backendHost) {
     console.error(

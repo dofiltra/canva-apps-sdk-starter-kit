@@ -125,7 +125,7 @@ export const App = () => {
     console.log("cpc", cpc);
     console.log("overlay", overlay);
 
-    addPage({
+    await addPage({
       title: `test`,
       elements: [
         {
@@ -138,32 +138,32 @@ export const App = () => {
           width: width / 3,
         },
       ],
-    }).then(() => {
-      openDesign({ type: "current_page" }, async (draft) => {
-        console.log(draft);
+    });
 
-        if (draft.page.type !== "fixed") {
-          return;
-        }
+    openDesign({ type: "current_page" }, async (draft) => {
+      console.log(draft);
 
-        // Moving all elements 50 pixels to the right and 50 pixels down
-        // draft.page.elements.forEach((element) => {
-        //   element.left += 50;
-        //   element.top += 50;
-        //   console.log(`Moved element to (${element.left}, ${element.top}).`);
-        // });
+      if (draft.page.type !== "fixed") {
+        return;
+      }
 
-        draft.page.elements.forEach((element, index) => {
-          console.log(
-            `Element ${index + 1}: Type=${element.type}, Position=(${element.left}, ${element.top})`,
-            element,
-          );
-          element.transparency = 0.35;
-          //
-        });
+      // Moving all elements 50 pixels to the right and 50 pixels down
+      // draft.page.elements.forEach((element) => {
+      //   element.left += 50;
+      //   element.top += 50;
+      //   console.log(`Moved element to (${element.left}, ${element.top}).`);
+      // });
 
-        return await draft.save();
+      draft.page.elements.forEach((element, index) => {
+        console.log(
+          `Element ${index + 1}: Type=${element.type}, Position=(${element.left}, ${element.top})`,
+          element,
+        );
+        element.transparency = 0.35;
+        //
       });
+
+      return await draft.save();
     });
   }
 
