@@ -63,6 +63,12 @@ export const App = () => {
     "datafile",
   );
   const [limitSlidesCount, setLimitSlidesCount] = useState(5);
+  const [opacity, setOpacity] = useState<Map<"text" | "image", number>>(
+    new Map([
+      ["text", 0.1],
+      ["image", 0.5],
+    ]),
+  );
   const [textConfig, setTextConfig] = useState<TextConfig>(initialConfig);
   const [selectedFont, setSelectedFont] = useState<Font | undefined>({
     ref: "YAEzvsyzAMI:0" as FontRef,
@@ -78,7 +84,6 @@ export const App = () => {
   } as Font);
   const [images, setImages] = useState([] as string[]);
   const [headings, setHeadings] = useState([] as string[]);
-
   const [canvaData, setCanvaData] = useState<TDatafile>({});
 
   const { fontWeight, fontStyle } = textConfig;
@@ -95,96 +100,7 @@ export const App = () => {
   };
 
   async function handleManualCreatePage() {
-    const { width = 1920, height = 1080 } = {
-      ...(await getDefaultPageDimensions()),
-    };
-
-    const nextPages = new Array(limitSlidesCount).fill(true).map((_, i) => ({
-      imageBase64: images[i],
-      heading: headings[i],
-    }));
-
-    for (const { heading, imageBase64 } of nextPages) {
-      if (!heading && !imageBase64) {
-        continue;
-      }
-
-      const img = imageBase64
-        ? await upload({
-            type: "image",
-            mimeType: "image/png",
-            aiDisclosure: "none",
-            url: imageBase64,
-            thumbnailUrl: imageBase64,
-          })
-        : null;
-
-      await sleep(5e3);
-
-      const elements: ElementAtPoint[] = [
-        img?.ref && {
-          type: "image",
-          altText: { decorative: false, text: "pic" },
-          height,
-          width: "auto",
-          left: 50,
-          top: 0,
-          ref: img.ref,
-        },
-      ].filter((x) => x) as ElementAtPoint[];
-
-      await addPage({
-        title: heading?.split(" ").slice(0, 2).join(" "),
-        elements,
-      });
-
-      if (heading?.trim?.()) {
-        addElement({
-          type: "text",
-          ...textConfig,
-          fontRef: selectedFont?.ref,
-          children: [heading],
-        });
-      }
-
-      await new Promise((resolve) => {
-        openDesign({ type: "current_page" }, async (draft) => {
-          if (draft.page.type !== "fixed") {
-            return resolve(false);
-          }
-
-          draft.page.elements.forEach(async (element, index) => {
-            console.log(
-              `#${index + 1}: Type=${element.type}, Position=(${element.left}, ${element.top})`,
-              element,
-            );
-            element.transparency = 0.25;
-
-            if (element.type === "text") {
-              element = {
-                ...element,
-                top: 50,
-                left: 100,
-                width: width / 3,
-              };
-            }
-
-            if (element.type === "rect") {
-              element.transparency = 0.3;
-            }
-          });
-
-          return resolve(await draft.save());
-        });
-      });
-
-      if (heading) {
-        setHeadings((old) => old.filter((o) => o !== heading));
-      }
-      if (imageBase64) {
-        setImages((old) => old.filter((o) => o !== imageBase64));
-      }
-    }
+    // TODO: use handleDatafileCreatePage
   }
 
   async function handleDatafileCreatePage() {
@@ -223,10 +139,10 @@ export const App = () => {
         ].filter((x) => x) as ElementAtPoint[];
 
         await addPage({
-          title: heading?.split(" ").slice(0, 2).join(" "),
+          title: heading?.slice(0, 255),
           elements,
         });
-        await sleep(3e3);
+        await sleep(1e3);
 
         if (heading?.trim?.() && i === 0) {
           addElement({
@@ -234,12 +150,7 @@ export const App = () => {
             ...textConfig,
             fontSize: 90,
             fontRef: selectedFont?.ref,
-            children: [
-              heading
-                .split(" ")
-                .map((w, i) => w + (i % 3 !== 0 ? "\n" : " "))
-                .join(""),
-            ],
+            children: [splitTextEveryNWords({ text: heading, everyN: 3 })],
           });
         }
 
@@ -256,7 +167,7 @@ export const App = () => {
               );
 
               if (element.type === "text") {
-                element.transparency = 0.25;
+                element.transparency = opacity.get("text") || 0.1;
                 element = {
                   ...element,
                   top: 50,
@@ -267,7 +178,7 @@ export const App = () => {
               }
 
               if (element.type === "rect") {
-                element.transparency = 0.3;
+                element.transparency = opacity.get("image") || 0.5;
               }
             });
 
@@ -317,50 +228,77 @@ export const App = () => {
       {tab === "settings" && (
         <>
           <Title>Settings</Title>
-          <hr />
           <br />
 
-          <Text>Add slides count</Text>
-          <NumberInput
-            onChangeComplete={(val) => setLimitSlidesCount(val || 3)}
-            defaultValue={limitSlidesCount}
-          />
-          <hr />
+          <Accordion>
+            <AccordionItem title="Slides">
+              <Text>Add slides count</Text>
+              <NumberInput
+                onChangeComplete={(val) => setLimitSlidesCount(val || 3)}
+                defaultValue={limitSlidesCount}
+              />
+            </AccordionItem>
 
-          <Text>Font</Text>
-          <Rows spacing="2u">
-            <Button
-              variant="secondary"
-              icon={ChevronDownIcon}
-              iconPosition="end"
-              alignment="start"
-              stretch={true}
-              onClick={async () => {
-                const response = await requestFontSelection({
-                  selectedFontRef: selectedFont?.ref,
-                });
-                console.log(`requestFontSelection`, response);
-                if (response.type === "completed") {
-                  setSelectedFont(response.font);
-                  resetSelectedFontStyleAndWeight(response.font);
+            <AccordionItem title="Slides">
+              <Text>Opacity text</Text>
+              <NumberInput
+                onChangeComplete={(val) =>
+                  setOpacity((old) => {
+                    old.set("text", val || 0.1);
+                    return old;
+                  })
                 }
-              }}
-            >
-              {selectedFont?.name || "Select a font"}
-            </Button>
-            {selectedFont?.previewUrl && (
-              <Box background="neutralLow" padding="2u" width="full">
-                <Rows spacing="0" align="center">
-                  <Box>
-                    <ImageCard
-                      thumbnailUrl={selectedFont.previewUrl}
-                      alt={selectedFont.name}
-                    />
+                defaultValue={opacity.get('text')}
+              />
+
+              <Text>Opacity image</Text>
+              <NumberInput
+                onChangeComplete={(val) =>
+                  setOpacity((old) => {
+                    old.set("image", val || 0.5);
+                    return old;
+                  })
+                }
+                defaultValue={opacity.get('image')}
+              />
+            </AccordionItem>
+
+            <AccordionItem title="Font">
+              <Rows spacing="2u">
+                <Button
+                  variant="secondary"
+                  icon={ChevronDownIcon}
+                  iconPosition="end"
+                  alignment="start"
+                  stretch={true}
+                  onClick={async () => {
+                    const response = await requestFontSelection({
+                      selectedFontRef: selectedFont?.ref,
+                    });
+                    console.log(`requestFontSelection`, response);
+                    if (response.type === "completed") {
+                      setSelectedFont(response.font);
+                      resetSelectedFontStyleAndWeight(response.font);
+                    }
+                  }}
+                >
+                  {selectedFont?.name || "Select a font"}
+                </Button>
+                {selectedFont?.previewUrl && (
+                  <Box background="neutralLow" padding="2u" width="full">
+                    <Rows spacing="0" align="center">
+                      <Box>
+                        <ImageCard
+                          thumbnailUrl={selectedFont.previewUrl}
+                          alt={selectedFont.name}
+                        />
+                      </Box>
+                    </Rows>
                   </Box>
-                </Rows>
-              </Box>
-            )}
-          </Rows>
+                )}
+              </Rows>
+            </AccordionItem>
+          </Accordion>
         </>
       )}
 
@@ -637,3 +575,18 @@ const toBase64 = (file: File): Promise<string> =>
     reader.onload = () => resolve(reader.result as string);
     reader.onerror = (error) => reject(error);
   });
+
+function splitTextEveryNWords({
+  text,
+  everyN = 3,
+}: {
+  text: string;
+  everyN?: number;
+}) {
+  return text
+    .split(" ")
+    .reduce((acc, word, index) => {
+      return acc + word + ((index + 1) % everyN === 0 ? "\n" : " ");
+    }, "")
+    .trim();
+}
