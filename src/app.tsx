@@ -62,6 +62,7 @@ export const App = () => {
   const [tab, setTab] = useState<"settings" | "datafile" | "manual">(
     "datafile",
   );
+  const [loading, setLoading] = useState(false);
   const [limitSlidesCount, setLimitSlidesCount] = useState(5);
   const [opacity, setOpacity] = useState<Map<"text" | "image", number>>(
     new Map([
@@ -104,6 +105,7 @@ export const App = () => {
   }
 
   async function handleDatafileCreatePage() {
+    setLoading(true);
     const { width = 1920, height = 1080 } = {
       ...(await getDefaultPageDimensions()),
     };
@@ -132,7 +134,7 @@ export const App = () => {
             altText: { decorative: false, text: "pic" },
             height,
             width: "auto",
-            left: 50,
+            left: 0,
             top: 0,
             ref: img.ref,
           },
@@ -170,14 +172,15 @@ export const App = () => {
                 element.transparency = opacity.get("text") || 0.1;
                 element = {
                   ...element,
-                  top: 50,
-                  left: 100,
-                  width: width,
-                  height: 90,
+                  top: 0,
+                  left: 0,
+                  // width: 'auto',
+                  height: height,
                 };
               }
 
               if (element.type === "rect") {
+                element.left = (width - element.width) / 2;
                 element.transparency = opacity.get("image") || 0.5;
               }
             });
@@ -193,6 +196,7 @@ export const App = () => {
         return old;
       });
     }
+    setLoading(false);
   }
 
   return (
@@ -248,7 +252,7 @@ export const App = () => {
                     return old;
                   })
                 }
-                defaultValue={opacity.get('text')}
+                defaultValue={opacity.get("text")}
               />
 
               <Text>Opacity image</Text>
@@ -259,7 +263,7 @@ export const App = () => {
                     return old;
                   })
                 }
-                defaultValue={opacity.get('image')}
+                defaultValue={opacity.get("image")}
               />
             </AccordionItem>
 
@@ -317,6 +321,7 @@ export const App = () => {
                 return;
               }
 
+              setLoading(true);
               const filetext = await file.text();
               try {
                 let data = JSON.parse(filetext) as TDatafile;
@@ -329,6 +334,7 @@ export const App = () => {
               } catch (e) {
                 console.error(e);
               }
+              setLoading(false);
             }}
           />
 
@@ -530,6 +536,7 @@ export const App = () => {
               handleManualCreatePage();
             }}
             stretch
+            disabled={loading}
           >
             Create next pages
           </Button>
