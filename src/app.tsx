@@ -14,6 +14,11 @@ import {
   TabList,
   Tabs,
   NumberInput,
+  Accordion,
+  AccordionItem,
+  Carousel,
+  EmbedCard,
+  TrashIcon,
 } from "@canva/app-ui-kit";
 import type { Font, FontStyle, FontWeightName } from "@canva/asset";
 import { findFonts, requestFontSelection, upload } from "@canva/asset";
@@ -41,6 +46,10 @@ type TextConfig = {
   fontStyle: FontStyle;
 };
 
+type TDatafile = {
+  [doprompt: string]: { base64: string[]; heading?: string };
+};
+
 const initialConfig: TextConfig = {
   color: "#8B3DFF",
   fontWeight: "normal",
@@ -50,9 +59,9 @@ const initialConfig: TextConfig = {
 
 export const App = () => {
   const addElement = useAddElement();
-  const [tab, setTab] = useState<
-    "images" | "headings" | "settings" | "datafile"
-  >("settings");
+  const [tab, setTab] = useState<"settings" | "datafile" | "manual">(
+    "datafile",
+  );
   const [limitSlidesCount, setLimitSlidesCount] = useState(5);
   const [textConfig, setTextConfig] = useState<TextConfig>(initialConfig);
   const [selectedFont, setSelectedFont] = useState<Font | undefined>({
@@ -70,9 +79,7 @@ export const App = () => {
   const [images, setImages] = useState([] as string[]);
   const [headings, setHeadings] = useState([] as string[]);
 
-  const [canvaData, setCanvaData] = useState<{
-    [doprompt: string]: { base64: string[]; heading?: string };
-  }>({});
+  const [canvaData, setCanvaData] = useState<TDatafile>({});
 
   const { fontWeight, fontStyle } = textConfig;
 
@@ -281,17 +288,26 @@ export const App = () => {
     <div className={styles.scrollContainer}>
       <Tabs>
         <TabList align="start">
-          <Tab id="settings" onClick={() => setTab("settings")}>
+          <Tab
+            id="settings"
+            active={tab === "settings"}
+            onClick={() => setTab("settings")}
+          >
             Settings
           </Tab>
-          <Tab id="datafile" onClick={() => setTab("datafile")}>
+          <Tab
+            id="datafile"
+            active={tab === "datafile"}
+            onClick={() => setTab("datafile")}
+          >
             Datafile
           </Tab>
-          <Tab id="images" onClick={() => setTab("images")}>
-            Images
-          </Tab>
-          <Tab id="headings" onClick={() => setTab("headings")}>
-            Headings
+          <Tab
+            id="manual"
+            active={tab === "manual"}
+            onClick={() => setTab("manual")}
+          >
+            Manual
           </Tab>
         </TabList>
       </Tabs>
@@ -365,171 +381,221 @@ export const App = () => {
 
               const filetext = await file.text();
               try {
-                setCanvaData(JSON.parse(filetext));
+                let data = JSON.parse(filetext) as TDatafile;
+
+                Object.keys(data).forEach((key) => {
+                  data[key].base64 = [...new Set(data[key].base64)];
+                });
+
+                setCanvaData(data);
               } catch (e) {
                 console.error(e);
               }
             }}
           />
 
-          <hr />
-          <Rows key={`canvaData`} spacing="1u">
-            <Box
-              border="standard"
-              padding="1u"
-              className={""}
-              // background={background}
-            >
-              <Scrollable
-              // indicator={{
-              //   background,
-              // }}
-              >
-                <Rows spacing="1u">
-                  {Object.keys(canvaData).map((key, i) => {
-                    return (
-                      <>
-                        <FileInputItem
-                          key={`canvaData_${i}`}
-                          label={key}
-                          onDeleteClick={() =>
-                            setCanvaData((old) => {
-                              delete old[key];
-                              return old;
-                            })
-                          }
-                        />
-                      </>
-                    );
-                  })}
-                </Rows>
-              </Scrollable>
-            </Box>
-          </Rows>
-        </>
-      )}
-
-      {tab === "images" && (
-        <>
-          <Title>Images</Title>
-          <hr />
           <br />
-          <Rows spacing="2u">
-            <FileInput
-              accept={["image/png"]}
-              multiple={true}
-              stretchButton
-              onDropAcceptedFiles={async (files) => {
-                setImages(
-                  await Promise.all(
-                    files.map(async (minifiedFile) => {
-                      const base64File = await toBase64(minifiedFile);
-                      return base64File;
-                    }),
-                  ),
-                );
-              }}
-            />
-          </Rows>
-
-          <hr />
-          <Rows key={`images`} spacing="1u">
-            <Box
-              border="standard"
-              padding="1u"
-              className={""}
-              // background={background}
-            >
-              <Scrollable
-              // indicator={{
-              //   background,
-              // }}
+          {!!Object.keys(canvaData).length && (
+            <Rows key={`canvaData`} spacing="1u">
+              <Box
+                border="standard"
+                padding="1u"
+                className={""}
+                // background={background}
               >
-                <Rows spacing="1u">
-                  {images.map((x, i) => {
-                    return (
-                      <>
-                        <FileInputItem
-                          key={`image_file_${i}`}
-                          label={`${images.length - i}`}
-                          onDeleteClick={() =>
-                            setImages((old) => old.filter((o) => o !== x))
-                          }
-                        />
-                      </>
-                    );
-                  })}
-                </Rows>
-              </Scrollable>
-            </Box>
-          </Rows>
+                <Scrollable
+                // indicator={{
+                //   background,
+                // }}
+                >
+                  <Rows spacing="1u">
+                    {Object.keys(canvaData).map((key, i) => {
+                      const { heading, base64 = [] } = canvaData[key];
+                      return (
+                        <>
+                          <FileInputItem
+                            key={`canvaData_${i}`}
+                            label={key}
+                            onDeleteClick={() =>
+                              setCanvaData((old) => {
+                                delete old[key];
+                                return old;
+                              })
+                            }
+                          />
+                          <Text>{heading}</Text>
+                          <Carousel>
+                            {base64.map((base64Item) => (
+                              <>
+                                <img
+                                  src={base64Item}
+                                  style={{ width: "100%", height: "128px" }}
+                                />
+
+                                <Button
+                                  alignment="center"
+                                  icon={() => <TrashIcon />}
+                                  onClick={() => {
+                                    console.log("x");
+
+                                    setCanvaData((old) => {
+                                      console.log(
+                                        "i1",
+                                        old[key].base64.some(
+                                          (x) => x === base64Item,
+                                        ),
+                                      );
+                                      old[key].base64 = old[key].base64.filter(
+                                        (x) => x !== base64Item,
+                                      );
+                                      console.log("o", old[key].base64.length);
+                                      return old;
+                                    });
+                                  }}
+                                  variant="tertiary"
+                                ></Button>
+                              </>
+                            ))}
+                          </Carousel>
+
+                          <br />
+                        </>
+                      );
+                    })}
+                  </Rows>
+                </Scrollable>
+              </Box>
+            </Rows>
+          )}
         </>
       )}
 
-      {tab === "headings" && (
+      {tab === "manual" && (
         <>
-          <Title>Headings</Title>
-          <hr />
+          <Title>Manual</Title>
           <br />
 
-          <MultilineInput
-            autoGrow
-            onBlur={(e) =>
-              setHeadings(
-                e.currentTarget.value.split("\n").filter((x) => x?.trim?.()),
-              )
-            }
-          />
-
-          <hr />
-          <Rows key={`headings`} spacing="1u">
-            <Box
-              border="standard"
-              padding="1u"
-              className={""}
-              // background={background}
-            >
-              <Scrollable
-              // indicator={{
-              //   background,
-              // }}
-              >
-                <Rows spacing="1u">
-                  {headings.map((x, i) => {
-                    return (
-                      <>
-                        <FileInputItem
-                          key={`heading_${i}`}
-                          label={`${i + 1}`}
-                          onDeleteClick={() =>
-                            setImages((old) => old.filter((o) => o !== x))
-                          }
-                        />
-                      </>
+          <Accordion>
+            <AccordionItem title="Images">
+              <Rows spacing="2u">
+                <FileInput
+                  accept={["image/png"]}
+                  multiple={true}
+                  stretchButton
+                  onDropAcceptedFiles={async (files) => {
+                    setImages(
+                      await Promise.all(
+                        files.map(async (minifiedFile) => {
+                          const base64File = await toBase64(minifiedFile);
+                          return base64File;
+                        }),
+                      ),
                     );
-                  })}
+                  }}
+                />
+              </Rows>
+
+              <br />
+              {!!images.length && (
+                <Rows key={`images`} spacing="1u">
+                  <Box
+                    border="standard"
+                    padding="1u"
+                    className={""}
+                    // background={background}
+                  >
+                    <Scrollable
+                    // indicator={{
+                    //   background,
+                    // }}
+                    >
+                      <Rows spacing="1u">
+                        {images.map((x, i) => {
+                          return (
+                            <>
+                              <FileInputItem
+                                key={`image_file_${i}`}
+                                label={`${images.length - i}`}
+                                onDeleteClick={() =>
+                                  setImages((old) => old.filter((o) => o !== x))
+                                }
+                              />
+                            </>
+                          );
+                        })}
+                      </Rows>
+                    </Scrollable>
+                  </Box>
                 </Rows>
-              </Scrollable>
-            </Box>
-          </Rows>
+              )}
+            </AccordionItem>
+            <AccordionItem title="Headings">
+              <MultilineInput
+                autoGrow
+                onBlur={(e) =>
+                  setHeadings(
+                    e.currentTarget.value
+                      .split("\n")
+                      .filter((x) => x?.trim?.()),
+                  )
+                }
+              />
+
+              <br />
+              {!!headings.length && (
+                <Rows key={`headings`} spacing="1u">
+                  <Box
+                    border="standard"
+                    padding="1u"
+                    className={""}
+                    // background={background}
+                  >
+                    <Scrollable
+                    // indicator={{
+                    //   background,
+                    // }}
+                    >
+                      <Rows spacing="1u">
+                        {headings.map((x, i) => {
+                          return (
+                            <>
+                              <FileInputItem
+                                key={`heading_${i}`}
+                                label={`${i + 1}`}
+                                onDeleteClick={() =>
+                                  setImages((old) => old.filter((o) => o !== x))
+                                }
+                              />
+                            </>
+                          );
+                        })}
+                      </Rows>
+                    </Scrollable>
+                  </Box>
+                </Rows>
+              )}
+            </AccordionItem>
+          </Accordion>
         </>
       )}
 
-      <hr />
-      <br />
       {((images.length || headings.length || Object.keys(canvaData).length) && (
-        <Button
-          variant="primary"
-          onClick={() => {
-            if (Object.keys(canvaData).length) {
-              return handleDatafileCreatePage();
-            }
-            handleManualCreatePage();
-          }}
-          stretch
-        >
-          Create next pages
-        </Button>
+        <>
+          <hr />
+          <br />
+          <Button
+            variant="primary"
+            onClick={() => {
+              if (Object.keys(canvaData).length) {
+                return handleDatafileCreatePage();
+              }
+              handleManualCreatePage();
+            }}
+            stretch
+          >
+            Create next pages
+          </Button>
+        </>
       )) ||
         ""}
     </div>
