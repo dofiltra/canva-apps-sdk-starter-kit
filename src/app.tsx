@@ -47,7 +47,7 @@ type TextConfig = {
 };
 
 type TDatafile = {
-  [doprompt: string]: { base64: string[]; heading?: string };
+  [doprompt: string]: { index: number; base64: string[]; heading?: string };
 };
 
 const initialConfig: TextConfig = {
@@ -110,7 +110,9 @@ export const App = () => {
       ...(await getDefaultPageDimensions()),
     };
 
-    const doprompts = Object.keys(canvaData).slice(0, limitSlidesCount);
+    const doprompts = Object.keys(canvaData)
+      .sort((a, b) => (canvaData[a].index > canvaData[b].index ? 1 : -1))
+      .slice(0, limitSlidesCount);
 
     for (const doprompt of doprompts) {
       const { base64 = [], heading } = canvaData[doprompt];
@@ -133,7 +135,7 @@ export const App = () => {
             type: "image",
             altText: { decorative: false, text: "pic" },
             height,
-            width: "auto",
+            width,
             left: 0,
             top: 0,
             ref: img.ref,
@@ -317,6 +319,7 @@ export const App = () => {
             stretchButton
             onDropAcceptedFiles={async (files) => {
               const file = files?.[0];
+
               if (!file) {
                 return;
               }
@@ -354,7 +357,7 @@ export const App = () => {
                 >
                   <Rows spacing="1u">
                     {Object.keys(canvaData).map((key, i) => {
-                      const { heading, base64 = [] } = canvaData[key];
+                      const { index, heading, base64 = [] } = canvaData[key];
                       return (
                         <>
                           <FileInputItem
@@ -367,7 +370,9 @@ export const App = () => {
                               })
                             }
                           />
-                          <Text>{heading}</Text>
+                          <Text>
+                            {index} {heading}
+                          </Text>
                           <Carousel>
                             {base64.map((base64Item) => (
                               <>
