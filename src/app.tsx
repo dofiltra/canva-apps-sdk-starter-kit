@@ -116,9 +116,10 @@ export const App = () => {
 
     for (const doprompt of doprompts) {
       const { base64 = [], heading } = canvaData[doprompt];
+      const uniqList = [...new Set(base64).values()];
       let i = 0;
 
-      for (const imageBase64 of [...new Set(base64).values()]) {
+      for (const imageBase64 of uniqList) {
         const img = imageBase64
           ? await upload({
               type: "image",
