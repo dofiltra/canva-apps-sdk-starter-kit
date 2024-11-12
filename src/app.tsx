@@ -129,8 +129,8 @@ export const App = () => {
               thumbnailUrl: imageBase64,
             })
           : null;
-        await img?.whenUploaded?.();
-        await sleep(1e3);
+        // await img?.whenUploaded?.();
+        await sleep(5e3);
 
         const elements: ElementAtPoint[] = [
           img?.ref && {
