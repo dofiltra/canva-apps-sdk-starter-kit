@@ -57,17 +57,23 @@ const initialConfig: TextConfig = {
   fontSize: 90,
 };
 
+const getStorageSceneKey = (o: { filename: string }) => {
+  return `LAST_SCENE_${o.filename}`;
+};
+
 export const App = () => {
   const addElement = useAddElement();
   const [tab, setTab] = useState<"settings" | "datafile" | "manual">(
     "datafile",
   );
   const [loading, setLoading] = useState(false);
-  const [limitSlidesCount, setLimitSlidesCount] = useState(5);
+  const [filename, setFilename] = useState("");
+  const [limitScenesCount, setLimitScenesCount] = useState(5);
+  const [startFromScene, setStartFromScene] = useState(0);
   const [opacity, setOpacity] = useState<Map<"text" | "image", number>>(
     new Map([
-      ["text", 0.1],
-      ["image", 0.5],
+      ["text", 0.88],
+      ["image", 0.01],
     ]),
   );
   const [textConfig, setTextConfig] = useState<TextConfig>(initialConfig);
@@ -112,96 +118,162 @@ export const App = () => {
 
     const doprompts = Object.keys(canvaData)
       .sort((a, b) => (canvaData[a].index > canvaData[b].index ? 1 : -1))
-      .slice(0, limitSlidesCount);
+      .filter((key) => canvaData[key]?.index >= startFromScene)
+      .slice(0, limitScenesCount);
 
     for (const doprompt of doprompts) {
-      const { base64 = [], heading } = canvaData[doprompt];
+      await createScene({ doprompt, width, height });
+    }
+    setLoading(false);
+  }
+
+  async function createScene({
+    doprompt,
+    height,
+    width,
+  }: {
+    doprompt: string;
+    width: number;
+    height: number;
+  }) {
+    try {
+      const { base64 = [], heading, index } = canvaData[doprompt];
       const uniqList = [...new Set(base64).values()];
       let i = 0;
 
       for (const imageBase64 of uniqList) {
-        const img = imageBase64
-          ? await upload({
-              type: "image",
-              mimeType: "image/png",
-              aiDisclosure: "none",
-              url: imageBase64,
-              thumbnailUrl: imageBase64,
-            })
-          : null;
-        // await img?.whenUploaded?.();
-        await sleep(5e3);
-
-        const elements: ElementAtPoint[] = [
-          img?.ref && {
-            type: "image",
-            altText: { decorative: false, text: "pic" },
-            height,
-            width,
-            left: 0,
-            top: 0,
-            ref: img.ref,
-          },
-        ].filter((x) => x) as ElementAtPoint[];
-
-        await addPage({
-          title: heading?.slice(0, 255),
-          elements,
+        await createSlide({
+          slideIndex: i++,
+          height,
+          width,
+          heading,
+          imageBase64,
         });
-        await sleep(1e3);
-
-        if (heading?.trim?.() && i === 0) {
-          addElement({
-            type: "text",
-            ...textConfig,
-            fontSize: 90,
-            fontRef: selectedFont?.ref,
-            children: [splitTextEveryNWords({ text: heading, everyN: 3 })],
-          });
-        }
-
-        await new Promise((resolve) => {
-          openDesign({ type: "current_page" }, async (draft) => {
-            if (draft.page.type !== "fixed") {
-              return resolve(false);
-            }
-
-            draft.page.elements.forEach(async (element, index) => {
-              console.log(
-                `#${index + 1}: Type=${element.type}, Position=(${element.left}, ${element.top})`,
-                element,
-              );
-
-              if (element.type === "text") {
-                element.transparency = opacity.get("text") || 0.1;
-                element = {
-                  ...element,
-                  top: 0,
-                  left: 0,
-                  // width: 'auto',
-                  height: height,
-                };
-              }
-
-              if (element.type === "rect") {
-                element.left = (width - element.width) / 2;
-                element.transparency = opacity.get("image") || 0.5;
-              }
-            });
-
-            return resolve(await draft.save());
-          });
-        });
-        i++;
       }
 
       setCanvaData((old) => {
         delete old[doprompt];
         return old;
       });
+      setStartFromScene(index + 1);
+    } catch (e) {
+      console.log(e);
     }
-    setLoading(false);
   }
+
+  async function createSlide(params: {
+    slideIndex: number;
+    imageBase64?: string;
+    height: number;
+    width: number;
+    heading?: string;
+    tryIndex?: number;
+  }) {
+    const {
+      imageBase64,
+      heading,
+      height,
+      width,
+      slideIndex,
+      tryIndex = 0,
+    } = params;
+    try {
+      const img = imageBase64
+        ? await upload({
+            type: "image",
+            mimeType: "image/png",
+            aiDisclosure: "none",
+            url: imageBase64,
+            thumbnailUrl: imageBase64,
+          })
+        : null;
+      // await img?.whenUploaded?.();
+      await sleep(4e3);
+
+      const elements: ElementAtPoint[] = [
+        img?.ref && {
+          type: "image",
+          altText: { decorative: false, text: "pic" },
+          height,
+          width,
+          left: 0,
+          top: 0,
+          ref: img.ref,
+        },
+      ].filter((x) => x) as ElementAtPoint[];
+
+      await addPage({
+        title: heading?.slice(0, 255),
+        elements,
+      });
+      await sleep(1e3);
+
+      if (heading?.trim?.() && slideIndex === 0) {
+        // await addElement({
+        //   type: "text",
+        //   ...textConfig,
+        //   fontSize: 90,
+        //   fontRef: selectedFont?.ref,
+        //   children: [splitTextEveryNWords({ text: heading, everyN: 3 })],
+        // });
+      }
+
+      await new Promise((resolve) => {
+        openDesign({ type: "current_page" }, async (draft) => {
+          if (draft.page.type !== "fixed") {
+            return resolve(false);
+          }
+
+          draft.page.elements.forEach(async (element, index) => {
+            console.log(
+              `#${index + 1}: Type=${element.type}, Position=(${element.left}, ${element.top})`,
+              element,
+            );
+
+            if (element.type === "text") {
+              element = {
+                ...element,
+                transparency: opacity.get("text") || 0.1,
+                top: 0,
+                left: 0,
+                // width: 'auto',
+                height: height,
+              };
+            }
+
+            if (element.type === "rect") {
+              element.left = (width - element.width) / 2;
+              element.transparency = opacity.get("image") || 0.5;
+            }
+          });
+
+          return resolve(await draft.save());
+        });
+      });
+    } catch (e) {
+      console.log(e);
+
+      if (tryIndex <= 3) {
+        await createSlide({ ...params, tryIndex: tryIndex + 1 });
+      }
+    }
+  }
+
+  // load last scene
+  useEffect(() => {
+    const lastScene = Number(
+      localStorage.getItem(getStorageSceneKey({ filename })) || 0,
+    );
+    setStartFromScene(lastScene);
+  }, [filename]);
+
+  // start from next scene
+  useEffect(() => {
+    localStorage.setItem(
+      getStorageSceneKey({ filename }),
+      startFromScene.toString(),
+    );
+  }, [startFromScene]);
 
   return (
     <div className={styles.scrollContainer}>
@@ -242,8 +314,8 @@ export const App = () => {
             <AccordionItem title="Slides">
               <Text>Add slides count</Text>
               <NumberInput
-                onChangeComplete={(val) => setLimitSlidesCount(val || 3)}
-                defaultValue={limitSlidesCount}
+                onChangeComplete={(val) => setLimitScenesCount(val || 3)}
+                defaultValue={limitScenesCount}
               />
             </AccordionItem>
 
@@ -312,8 +384,14 @@ export const App = () => {
 
       {tab === "datafile" && (
         <>
-          <Title>Datafiles</Title>
+          <Title>Datafile</Title>
           <hr />
+          <br />
+          <Text>Start from scene #</Text>
+          <NumberInput
+            onChangeComplete={(val) => setStartFromScene(Number(val || 0))}
+            defaultValue={startFromScene}
+          />
           <br />
           <FileInput
             accept={[".json", ".txt"]}
@@ -327,6 +405,8 @@ export const App = () => {
               }
 
               setLoading(true);
+              setFilename(file.name);
+
               const filetext = await file.text();
               try {
                 let data = JSON.parse(filetext) as TDatafile;
