@@ -203,7 +203,7 @@ export const App = () => {
       ].filter((x) => x) as ElementAtPoint[];
 
       await addPage({
-        title: heading?.slice(0, 255),
+        title: heading?.slice(0, 255) || Math.random().toString(),
         elements,
       });
       await sleep(1e3);
